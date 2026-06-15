@@ -1,0 +1,50 @@
+export type TagKind = 'note' | 'requirement' | 'action' | 'decision';
+
+export const TAG_META: Record<
+  TagKind,
+  { label: string; color: string; short: string }
+> = {
+  note: { label: 'Important Note', color: '#2563EB', short: 'Note' },
+  requirement: { label: 'Requirement', color: '#7C3AED', short: 'Requirement' },
+  action: { label: 'Action Item', color: '#D97706', short: 'Action' },
+  decision: { label: 'Decision', color: '#059669', short: 'Decision' },
+};
+
+export const TAG_ORDER: TagKind[] = ['note', 'requirement', 'action', 'decision'];
+
+/** A single transcribed chunk with a time range. */
+export interface Segment {
+  id: string;
+  start: number; // seconds
+  end: number; // seconds
+  text: string;
+  speaker?: string; // only set if the user labels it
+  tags: TagKind[]; // user annotations
+  isQuestion: boolean; // rule-based detection
+}
+
+export interface QnA {
+  questionId: string;
+  question: string;
+  questionStart: number;
+  /** Segment ids whose text forms the heuristic answer. */
+  answerSegmentIds: string[];
+  answer: string;
+}
+
+export interface TranscriptDoc {
+  fileName: string;
+  createdAt: string; // ISO date
+  durationSec: number;
+  model: string;
+  language: string;
+  segments: Segment[];
+}
+
+export type TranscriberStatus =
+  | 'idle'
+  | 'loading-model'
+  | 'decoding'
+  | 'transcribing'
+  | 'done'
+  | 'error';

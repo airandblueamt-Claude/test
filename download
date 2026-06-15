@@ -1,0 +1,70 @@
+// Decodes an audio File (MP3/WAV/M4A/etc.) into the mono 16 kHz Float32Array
+// that Whisper expects. Runs on the main thread because OfflineAudioContext is
+// not available inside a worker in all browsers.
+
+const TARGET_SAMPLE_RATE = 16000;
+
+export async function decodeAudioToMono16k(
+  file: File,
+  onProgress?: (ratio: number) => void,
+): Promise<{ audio: Float32Array; durationSec: number }> {
+  onProgress?.(0.05);
+  const arrayBuffer = await file.arrayBuffer();
+
+  // Decode using the platform's codecs (handles MP3, M4A, WAV, OGG, ...).
+  const AudioCtx =
+    window.AudioContext ||
+    (window as unknown as { webkitAudioContext: typeof AudioContext })
+      .webkitAudioContext;
+  const decodeCtx = new AudioCtx();
+  const decoded = await decodeCtx.decodeAudioData(arrayBuffer.slice(0));
+  await decodeCtx.close();
+  onProgress?.(0.4);
+
+  const durationSec = decoded.duration;
+
+  // Downmix to mono.
+  const channels = decoded.numberOfChannels;
+  const length = decoded.length;
+  const mono = new Float32Array(length);
+  for (let c = 0; c < channels; c++) {
+    const data = decoded.getChannelData(c);
+    for (let i = 0; i < length; i++) mono[i] += data[i] / channels;
+  }
+  onProgress?.(0.6);
+
+  // Resample to 16 kHz with an OfflineAudioContext (high quality, browser-native).
+  if (decoded.sampleRate === TARGET_SAMPLE_RATE) {
+    onProgress?.(1);
+    return { audio: mono, durationSec };
+  }
+
+  const offlineLength = Math.ceil(
+    (mono.length * TARGET_SAMPLE_RATE) / decoded.sampleRate,
+  );
+  const offlineCtx = new OfflineAudioContext(
+    1,
+    offlineLength,
+    TARGET_SAMPLE_RATE,
+  );
+  const buffer = offlineCtx.createBuffer(1, mono.length, decoded.sampleRate);
+  buffer.copyToChannel(mono, 0);
+  const src = offlineCtx.createBufferSource();
+  src.buffer = buffer;
+  src.connect(offlineCtx.destination);
+  src.start();
+  const rendered = await offlineCtx.startRendering();
+  onProgress?.(1);
+
+  return { audio: rendered.getChannelData(0).slice(), durationSec };
+}
+
+export function formatTime(seconds: number): string {
+  if (!isFinite(seconds) || seconds < 0) seconds = 0;
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  const mm = String(m).padStart(2, '0');
+  const ss = String(s).padStart(2, '0');
+  return h > 0 ? `${h}:${mm}:${ss}` : `${m}:${ss}`;
+}

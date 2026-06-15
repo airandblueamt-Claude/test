@@ -1,0 +1,28 @@
+'use client';
+
+import { forwardRef } from 'react';
+import { Music2 } from 'lucide-react';
+
+interface Props {
+  src: string;
+  fileName: string;
+}
+
+// Exposes the underlying <audio> via ref so the transcript can seek to a
+// timestamp when a segment is clicked.
+const AudioPlayer = forwardRef<HTMLAudioElement, Props>(function AudioPlayer(
+  { src, fileName },
+  ref,
+) {
+  return (
+    <div className="rounded-xl border border-line bg-white p-3">
+      <div className="mb-2 flex items-center gap-2 truncate font-mono text-xs text-muted">
+        <Music2 size={14} className="shrink-0" />
+        <span className="truncate">{fileName}</span>
+      </div>
+      <audio ref={ref} src={src} controls preload="metadata" className="w-full" />
+    </div>
+  );
+});
+
+export default AudioPlayer;
